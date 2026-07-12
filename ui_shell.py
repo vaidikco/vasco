@@ -1,7 +1,27 @@
 import sys
+import ctypes
+from ctypes import wintypes
 from PyQt6.QtWidgets import QApplication, QWidget, QFrame, QVBoxLayout, QLabel
 from PyQt6.QtCore import Qt, QPropertyAnimation, QRect, QEasingCurve, QPoint, QSize
 from PyQt6.QtGui import QColor, QPalette
+
+# Win32 API for Acrylic Blur
+class ACCENT_POLICY(ctypes.Structure):
+    _fields_ = [
+        ("AccentState", ctypes.c_int),
+        ("AccentFlags", ctypes.c_int),
+        ("GradientColor", ctypes.c_int),
+        ("AnimationId", ctypes.c_int),
+    ]
+
+class WINDOWCOMPOSITIONCORE(ctypes.Structure):
+    _fields_ = [
+        ("SizingMode", ctypes.c_int),
+        ("AccentPolicy", ACCENT_POLICY),
+    ]
+
+def SetWindowCompositionAttribute(hwnd, data):
+    return ctypes.windll.user32.SetWindowCompositionAttribute(hwnd, ctypes.byref(data))
 
 class DynamicIsland(QWidget):
     def __init__(self):
@@ -11,14 +31,18 @@ class DynamicIsland(QWidget):
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
+        # Enable native Windows Acrylic blur
+        self.enable_blur_behind()
+
         # State Configuration
         # format: (width, height, color, text)
+        # Using rgba for Acrylic transparency
         self.states = {
-            "IDLE": (150, 35, "#2c3e50", "Jarvis"),
-            "LISTENING": (300, 50, "#3498db", "Listening..."),
-            "THINKING": (300, 50, "#9b59b6", "Thinking..."),
-            "SPEAKING": (300, 50, "#2ecc71", "Speaking..."),
-            "EXECUTING": (300, 50, "#e67e22", "Executing..."),
+            "IDLE": (150, 35, "rgba(44, 62, 80, 0.6)", "Jarvis"),
+            "LISTENING": (300, 50, "rgba(52, 152, 219, 0.6)", "Listening..."),
+            "THINKING": (300, 50, "rgba(155, 89, 182, 0.6)", "Thinking..."),
+            "SPEAKING": (300, 50, "rgba(46, 204, 113, 0.6)", "Speaking..."),
+            "EXECUTING": (300, 50, "rgba(230, 126, 34, 0.6)", "Executing..."),
         }
         self.current_state = "IDLE"
 
@@ -28,7 +52,7 @@ class DynamicIsland(QWidget):
 
         self.container = QFrame()
         self.container.setObjectName("islandContainer")
-        self.container.setStyleSheet(self._get_style("#2c3e50"))
+        self.container.setStyleSheet(self._get_style(self.states["IDLE"][2]))
 
         self.label = QLabel("Jarvis", self.container)
         self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -49,6 +73,26 @@ class DynamicIsland(QWidget):
         self.animation = QPropertyAnimation(self, b"geometry")
         self.animation.setDuration(300)
         self.animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
+
+    def enable_blur_behind(self):
+        """Applies the native Windows Acrylic blur effect to the current window."""
+        hwnd = self.winId()
+
+        # AccentState 4 = ACCENT_ENABLE_ACRYLICBLUR
+        # GradientColor is ABGR. We use a subtle tint.
+        policy = ACCENT_POLICY(
+            AccentState=4,
+            AccentFlags=2,
+            GradientColor=0x00FFFFFF, # White tint, alpha 0
+            AnimationId=0
+        )
+
+        core = WINDOWCOMPOSITIONCORE(
+            SizingMode=0,
+            AccentPolicy=policy
+        )
+
+        SetWindowCompositionAttribute(hwnd, core)
 
     def _get_style(self, color):
         return f"""
