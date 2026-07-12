@@ -2,8 +2,8 @@ import sys
 import ctypes
 from ctypes import wintypes
 from PyQt6.QtWidgets import QApplication, QWidget, QFrame, QVBoxLayout, QLabel
-from PyQt6.QtCore import Qt, QPropertyAnimation, QRect, QEasingCurve, QPoint, QSize
-from PyQt6.QtGui import QColor, QPalette
+from PyQt6.QtCore import Qt, QPropertyAnimation, QRect, QEasingCurve, QPoint, QSize, QVariantAnimation
+from PyQt6.QtGui import QColor, QPalette, QPainter, QPen, QRadialGradient
 from core_bridge import VascoSignals
 from Vasco_core import CoreWorker
 from asr_module import SpeechRecognizer
@@ -27,6 +27,65 @@ class WINDOWCOMPOSITIONCORE(ctypes.Structure):
 
 def SetWindowCompositionAttribute(hwnd, data):
     return ctypes.windll.user32.SetWindowCompositionAttribute(hwnd, ctypes.byref(data))
+
+class OCRWaveOverlay(QWidget):
+    """
+    A full-screen, transparent overlay that displays a pulsing wave border
+    when Vasco is scanning the screen.
+    """
+    def __init__(self):
+        super().__init__()
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint |
+            Qt.WindowType.WindowStaysOnTopHint |
+            Qt.WindowType.Tool |
+            Qt.WindowType.WindowTransparentForInput
+        )
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+
+        # Full screen
+        self.screen_geom = QApplication.primaryScreen().geometry()
+        self.setGeometry(self.screen_geom)
+
+        # Animation for the wave effect
+        self.glow_intensity = 0.0
+        self.animation = QVariantAnimation()
+        self.animation.setStartValue(0.0)
+        self.animation.setEndValue(1.0)
+        self.animation.setDuration(1500)
+        self.animation.setLoopCount(-1) # Infinite loop
+        self.animation.setEasingCurve(QEasingCurve.Type.InOutSine)
+        self.animation.valueChanged.connect(self.update_glow)
+
+    def update_glow(self, value):
+        self.glow_intensity = value
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        # Calculate pulse colors
+        # Subtle white (0.1 alpha) -> Vibrant blue (0.6 alpha)
+        alpha = 0.1 + (self.glow_intensity * 0.5)
+        color = QColor(0, 150, 255, int(255 * alpha))
+
+        pen = QPen(color)
+        # Thickness pulses as well
+        pen.setWidth(int(10 + (self.glow_intensity * 20)))
+        painter.setPen(pen)
+
+        # Draw the "wave" border
+        rect = self.rect().adjusted(5, 5, -5, -5)
+        painter.drawRoundedRect(rect, 20, 20)
+
+    def start_wave(self):
+        self.show()
+        self.animation.start()
+
+    def stop_wave(self):
+        self.animation.stop()
+        self.hide()
 
 class DynamicIsland(QWidget):
     def __init__(self, signals=None):
@@ -55,8 +114,12 @@ class DynamicIsland(QWidget):
             "THINKING": (int(300 * self.scale_factor), int(50 * self.scale_factor), "rgba(155, 89, 182, 0.4)", "Thinking..."),
             "SPEAKING": (int(300 * self.scale_factor), int(50 * self.scale_factor), "rgba(46, 204, 113, 0.4)", "Speaking..."),
             "EXECUTING": (int(300 * self.scale_factor), int(50 * self.scale_factor), "rgba(230, 126, 34, 0.4)", "Executing..."),
+            "SCANNING": (int(300 * self.scale_factor), int(50 * self.scale_factor), "rgba(0, 150, 255, 0.4)", "Scanning Screen..."),
         }
         self.current_state = "IDLE"
+
+        # OCR Overlay
+        self.overlay = OCRWaveOverlay()
 
         # UI Components
         self.main_layout = QVBoxLayout(self)
@@ -135,6 +198,12 @@ class DynamicIsland(QWidget):
         if state not in self.states:
             print(f"Invalid state: {state}")
             return
+
+        # Handle OCR Overlay
+        if state == "SCANNING":
+            self.overlay.start_wave()
+        else:
+            self.overlay.stop_wave()
 
         self.current_state = state
         width, height, color, text = self.states[state]

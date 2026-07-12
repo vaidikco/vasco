@@ -5,6 +5,7 @@ from PyQt6.QtCore import QThread, pyqtSlot
 from core_bridge import VascoSignals
 from brain_router import BrainRouter
 from executor import ScriptExecutor
+from ocr_module import OCRModule
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -16,6 +17,7 @@ class VascoState(Enum):
     THINKING = "THINKING"
     SPEAKING = "SPEAKING"
     EXECUTING = "EXECUTING"
+    SCANNING = "SCANNING"
 
 class VascoCore:
     """
@@ -28,6 +30,7 @@ class VascoCore:
         self._stop_event = asyncio.Event()
         self.router = BrainRouter()
         self.executor = ScriptExecutor()
+        self.ocr = OCRModule()
         self.tts = tts
         self.loop = None
 
@@ -65,8 +68,27 @@ class VascoCore:
         """Processes user text through the brain router and manages state transitions."""
         logger.info(f"Processing text: {text}")
 
-        # 1. Enter THINKING state
+        # 1. Check for OCR triggers
+        text_lower = text.lower()
+        if any(word in text_lower for word in ["look", "screen", "see", "what is on"]):
+            logger.info("OCR trigger detected. Scanning screen...")
+            self.set_state(VascoState.SCANNING)
+
+            # Run OCR in a thread to avoid blocking the async loop
+            loop = asyncio.get_running_loop()
+            success, screen_text = await loop.run_in_executor(None, self.ocr.scan_screen)
+
+            if success:
+                logger.info(f"Screen scan successful. Found: {screen_text[:100]}...")
+                # Append screen text to the user's query as context
+                text = f"{text} [Screen Content: {screen_text}]"
+            else:
+                logger.error(f"Screen scan failed: {screen_text}")
+                text = f"{text} (Screen scan failed)"
+
+        # 2. Enter THINKING state
         self.set_state(VascoState.THINKING)
+
 
         # 2. Route and get response
         route, prompt = await self.router.route_intent(text)
