@@ -6,6 +6,7 @@ from core_bridge import VascoSignals
 from brain_router import BrainRouter
 from executor import ScriptExecutor
 from ocr_module import OCRModule
+from memory_manager import MemoryManager
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -31,6 +32,7 @@ class VascoCore:
         self.router = BrainRouter()
         self.executor = ScriptExecutor()
         self.ocr = OCRModule()
+        self.memory = MemoryManager()
         self.tts = tts
         self.loop = None
 
@@ -68,26 +70,49 @@ class VascoCore:
         """Processes user text through the brain router and manages state transitions."""
         logger.info(f"Processing text: {text}")
 
-        # 1. Check for OCR triggers
+        # 1. Handle Explicit Memory Requests
         text_lower = text.lower()
+        if "remember that" in text_lower:
+            memory_content = text.split("remember that", 1)[1].strip()
+            topic = f"Fact: {memory_content[:30]}..."
+            self.memory.remember(topic, memory_content, category="user_facts")
+            logger.info(f"Stored memory: {memory_content}")
+            self.set_state(VascoState.SPEAKING)
+            if self.tts:
+                self.tts.speak("I've added that to my memory.")
+                while self.tts.is_currently_speaking():
+                    await asyncio.sleep(0.1)
+            await asyncio.sleep(1)
+            self.set_state(VascoState.IDLE)
+            return "memory_saved"
+
+        # 2. Check for OCR triggers
         if any(word in text_lower for word in ["look", "screen", "see", "what is on"]):
             logger.info("OCR trigger detected. Scanning screen...")
             self.set_state(VascoState.SCANNING)
 
-            # Run OCR in a thread to avoid blocking the async loop
             loop = asyncio.get_running_loop()
             success, screen_text = await loop.run_in_executor(None, self.ocr.scan_screen)
 
             if success:
                 logger.info(f"Screen scan successful. Found: {screen_text[:100]}...")
-                # Append screen text to the user's query as context
                 text = f"{text} [Screen Content: {screen_text}]"
             else:
                 logger.error(f"Screen scan failed: {screen_text}")
                 text = f"{text} (Screen scan failed)"
 
-        # 2. Enter THINKING state
+        # 3. Memory Retrieval (The Visual Brain)
+        logger.info(f"Recalling memories for: {text}")
+        memories = self.memory.recall(text)
+        if memories:
+            context_fragments = [m['content'] for m in memories]
+            memory_context = "\n".join(context_fragments)
+            text = f"{text} [Relevant Memories: {memory_context}]"
+            logger.info(f"Injected {len(memories)} memories into context.")
+
+        # 4. Enter THINKING state
         self.set_state(VascoState.THINKING)
+
 
 
         # 2. Route and get response
@@ -191,4 +216,5 @@ class CoreWorker(QThread):
         self.core.stop()
         self.quit()
         self.wait()
+
 
