@@ -34,15 +34,18 @@ class DynamicIsland(QWidget):
         # Enable native Windows Acrylic blur
         self.enable_blur_behind()
 
+        # DPI Scaling
+        self.scale_factor = QApplication.primaryScreen().logicalDotsPerInchX() / 96.0
+
         # State Configuration
         # format: (width, height, color, text)
         # Using rgba for Acrylic transparency
         self.states = {
-            "IDLE": (150, 35, "rgba(44, 62, 80, 0.4)", "Jarvis"),
-            "LISTENING": (300, 50, "rgba(52, 152, 219, 0.4)", "Listening..."),
-            "THINKING": (300, 50, "rgba(155, 89, 182, 0.4)", "Thinking..."),
-            "SPEAKING": (300, 50, "rgba(46, 204, 113, 0.4)", "Speaking..."),
-            "EXECUTING": (300, 50, "rgba(230, 126, 34, 0.4)", "Executing..."),
+            "IDLE": (int(150 * self.scale_factor), int(35 * self.scale_factor), "rgba(44, 62, 80, 0.4)", "Jarvis"),
+            "LISTENING": (int(300 * self.scale_factor), int(50 * self.scale_factor), "rgba(52, 152, 219, 0.4)", "Listening..."),
+            "THINKING": (int(300 * self.scale_factor), int(50 * self.scale_factor), "rgba(155, 89, 182, 0.4)", "Thinking..."),
+            "SPEAKING": (int(300 * self.scale_factor), int(50 * self.scale_factor), "rgba(46, 204, 113, 0.4)", "Speaking..."),
+            "EXECUTING": (int(300 * self.scale_factor), int(50 * self.scale_factor), "rgba(230, 126, 34, 0.4)", "Executing..."),
         }
         self.current_state = "IDLE"
 
@@ -52,6 +55,9 @@ class DynamicIsland(QWidget):
 
         self.container = QFrame()
         self.container.setObjectName("islandContainer")
+
+        # Sizing and Positioning - Must be set before style to get correct height() for border-radius
+        self.setFixedSize(*self.states["IDLE"][:2])
         self.container.setStyleSheet(self._get_style(self.states["IDLE"][2]))
 
         self.label = QLabel("Jarvis", self.container)
@@ -64,9 +70,6 @@ class DynamicIsland(QWidget):
         container_layout.addWidget(self.label)
 
         self.main_layout.addWidget(self.container)
-
-        # Sizing and Positioning
-        self.setFixedSize(*self.states["IDLE"][:2])
         self._position_on_screen()
 
         # Animation setup
@@ -92,7 +95,11 @@ class DynamicIsland(QWidget):
             AccentPolicy=policy
         )
 
-        SetWindowCompositionAttribute(hwnd, core)
+        try:
+            SetWindowCompositionAttribute(hwnd, core)
+        except AttributeError:
+            print("Warning: SetWindowCompositionAttribute not found. Blur effect disabled.")
+            return
 
     def _get_style(self, color):
         return f"""
