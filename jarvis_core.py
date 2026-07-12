@@ -4,6 +4,7 @@ from enum import Enum
 from PyQt6.QtCore import QThread, pyqtSlot
 from core_bridge import JarvisSignals
 from brain_router import BrainRouter
+from executor import ScriptExecutor
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -26,6 +27,7 @@ class JarvisCore:
         self.state = JarvisState.IDLE
         self._stop_event = asyncio.Event()
         self.router = BrainRouter()
+        self.executor = ScriptExecutor()
 
     def set_state(self, state: JarvisState):
         """Updates the core state and notifies the UI."""
@@ -45,14 +47,22 @@ class JarvisCore:
         route, prompt = await self.router.route_intent(text)
         logger.info(f"Router decided: {route}")
 
-        # In a real system, we'd get the response here
-        # response = await self.router.process(text)
-
         # 3. Determine next state
         if route == "local":
-            # Local intents usually trigger execution
+            # Local intents trigger execution
             self.set_state(JarvisState.EXECUTING)
             logger.info(f"Executing local command: {text}")
+
+            # Generate script (mocked simulation of LLM)
+            script = self._generate_local_script(text)
+            if script:
+                success, output = self.executor.execute_script(script)
+                if success:
+                    logger.info(f"Execution successful: {output}")
+                else:
+                    logger.error(f"Execution failed: {output}")
+            else:
+                logger.error(f"Could not generate script for: {text}")
         else:
             # Cloud intents usually trigger a spoken response
             self.set_state(JarvisState.SPEAKING)
@@ -63,6 +73,19 @@ class JarvisCore:
         self.set_state(JarvisState.IDLE)
 
         return route
+
+    def _generate_local_script(self, text: str) -> str:
+        """
+        Simulates an LLM generating a Python script for a local action.
+        """
+        text_lower = text.lower()
+        if "open notepad" in text_lower:
+            return "import os\nos.startfile('notepad.exe')"
+        if "open calculator" in text_lower:
+            return "import os\nos.startfile('calc.exe')"
+
+        # Default fallback for other local commands
+        return f"print('Simulated execution for: {text}')"
 
     async def run(self):
         """
