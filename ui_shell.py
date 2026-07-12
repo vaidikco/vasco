@@ -38,11 +38,11 @@ class DynamicIsland(QWidget):
         # format: (width, height, color, text)
         # Using rgba for Acrylic transparency
         self.states = {
-            "IDLE": (150, 35, "rgba(44, 62, 80, 0.6)", "Jarvis"),
-            "LISTENING": (300, 50, "rgba(52, 152, 219, 0.6)", "Listening..."),
-            "THINKING": (300, 50, "rgba(155, 89, 182, 0.6)", "Thinking..."),
-            "SPEAKING": (300, 50, "rgba(46, 204, 113, 0.6)", "Speaking..."),
-            "EXECUTING": (300, 50, "rgba(230, 126, 34, 0.6)", "Executing..."),
+            "IDLE": (150, 35, "rgba(44, 62, 80, 0.4)", "Jarvis"),
+            "LISTENING": (300, 50, "rgba(52, 152, 219, 0.4)", "Listening..."),
+            "THINKING": (300, 50, "rgba(155, 89, 182, 0.4)", "Thinking..."),
+            "SPEAKING": (300, 50, "rgba(46, 204, 113, 0.4)", "Speaking..."),
+            "EXECUTING": (300, 50, "rgba(230, 126, 34, 0.4)", "Executing..."),
         }
         self.current_state = "IDLE"
 
@@ -76,7 +76,7 @@ class DynamicIsland(QWidget):
 
     def enable_blur_behind(self):
         """Applies the native Windows Acrylic blur effect to the current window."""
-        hwnd = self.winId()
+        hwnd = int(self.winId())
 
         # AccentState 4 = ACCENT_ENABLE_ACRYLICBLUR
         # GradientColor is ABGR. We use a subtle tint.
@@ -97,9 +97,11 @@ class DynamicIsland(QWidget):
     def _get_style(self, color):
         return f"""
             #islandContainer {{
-                background-color: {color};
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                            stop:0 rgba(255, 255, 255, 0.3),
+                                            stop:1 {color});
+                border: 1px solid rgba(255, 255, 255, 0.4);
                 border-radius: {self.height() // 2}px;
-                border: 1px solid rgba(255, 255, 255, 0.1);
             }}
         """
 
