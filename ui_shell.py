@@ -5,6 +5,7 @@ from PyQt6.QtWidgets import QApplication, QWidget, QFrame, QVBoxLayout, QLabel
 from PyQt6.QtCore import Qt, QPropertyAnimation, QRect, QEasingCurve, QPoint, QSize
 from PyQt6.QtGui import QColor, QPalette
 from core_bridge import JarvisSignals
+from jarvis_core import CoreWorker
 
 # Win32 API for Acrylic Blur
 class ACCENT_POLICY(ctypes.Structure):
@@ -152,23 +153,15 @@ class DynamicIsland(QWidget):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
 
-    island = DynamicIsland()
+    # Initialize signals
+    signals = JarvisSignals()
+
+    # Initialize UI
+    island = DynamicIsland(signals=signals)
     island.show()
 
-    # --- TEST LOOP ---
-    from PyQt6.QtCore import QTimer
-
-    test_states = ["IDLE", "LISTENING", "THINKING", "SPEAKING", "EXECUTING", "IDLE"]
-    state_index = 0
-
-    def cycle_state():
-        global state_index
-        state = test_states[state_index]
-        island.set_state(state)
-        state_index = (state_index + 1) % len(test_states)
-
-    timer = QTimer()
-    timer.timeout.connect(cycle_state)
-    timer.start(2000) # Change state every 2 seconds
+    # Initialize and start the Core Worker (Asyncio Orchestrator)
+    worker = CoreWorker(signals=signals)
+    worker.start()
 
     sys.exit(app.exec())
