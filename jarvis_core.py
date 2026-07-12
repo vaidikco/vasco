@@ -3,6 +3,7 @@ import logging
 from enum import Enum
 from PyQt6.QtCore import QThread, pyqtSlot
 from core_bridge import JarvisSignals
+from brain_router import BrainRouter
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -24,6 +25,7 @@ class JarvisCore:
         self.signals = signals
         self.state = JarvisState.IDLE
         self._stop_event = asyncio.Event()
+        self.router = BrainRouter()
 
     def set_state(self, state: JarvisState):
         """Updates the core state and notifies the UI."""
@@ -31,6 +33,36 @@ class JarvisCore:
         self.state = state
         # Emit signal to the UI thread
         self.signals.state_changed.emit(state.value)
+
+    async def process_text(self, text: str):
+        """Processes user text through the brain router and manages state transitions."""
+        logger.info(f"Processing text: {text}")
+
+        # 1. Enter THINKING state
+        self.set_state(JarvisState.THINKING)
+
+        # 2. Route and get response
+        route, prompt = await self.router.route_intent(text)
+        logger.info(f"Router decided: {route}")
+
+        # In a real system, we'd get the response here
+        # response = await self.router.process(text)
+
+        # 3. Determine next state
+        if route == "local":
+            # Local intents usually trigger execution
+            self.set_state(JarvisState.EXECUTING)
+            logger.info(f"Executing local command: {text}")
+        else:
+            # Cloud intents usually trigger a spoken response
+            self.set_state(JarvisState.SPEAKING)
+            logger.info(f"Speaking cloud response for: {text}")
+
+        # Return to IDLE after a short delay (simulation)
+        await asyncio.sleep(1)
+        self.set_state(JarvisState.IDLE)
+
+        return route
 
     async def run(self):
         """
