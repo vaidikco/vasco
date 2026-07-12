@@ -4,6 +4,7 @@ from ctypes import wintypes
 from PyQt6.QtWidgets import QApplication, QWidget, QFrame, QVBoxLayout, QLabel
 from PyQt6.QtCore import Qt, QPropertyAnimation, QRect, QEasingCurve, QPoint, QSize
 from PyQt6.QtGui import QColor, QPalette
+from core_bridge import JarvisSignals
 
 # Win32 API for Acrylic Blur
 class ACCENT_POLICY(ctypes.Structure):
@@ -24,12 +25,16 @@ def SetWindowCompositionAttribute(hwnd, data):
     return ctypes.windll.user32.SetWindowCompositionAttribute(hwnd, ctypes.byref(data))
 
 class DynamicIsland(QWidget):
-    def __init__(self):
+    def __init__(self, signals=None):
         super().__init__()
 
         # Window setup: Frameless, Always-on-top, Translucent
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+
+        if signals:
+            signals.state_changed.connect(self.set_state)
+            signals.text_update.connect(self.update_text)
 
         # Enable native Windows Acrylic blur
         self.enable_blur_behind()
@@ -117,6 +122,10 @@ class DynamicIsland(QWidget):
         x = (screen.width() - self.width()) // 2
         y = screen.y() + 10 # Slight offset from the very top
         self.move(x, y)
+
+    def update_text(self, text):
+        """Updates the label text without changing the overall state."""
+        self.label.setText(text)
 
     def set_state(self, state):
         if state not in self.states:
