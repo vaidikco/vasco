@@ -8,115 +8,116 @@ from typing import Tuple, List
 logger = logging.getLogger("ScriptExecutor")
 
 class SafetyVisitor(ast.NodeVisitor):
-    def __init__(self, forbidden_funcs):
-        self.forbidden_funcs = forbidden_funcs
+    def __init__(self):
+        self.allowed_modules = {'math', 'datetime', 'json', 'random', 'os'}
+        self.module_whitelists = {
+            'os': {'startfile', 'getcwd'}
+        }
+        self.allowed_builtins = {
+            'print', 'len', 'range', 'int', 'str', 'float', 'list',
+            'dict', 'set', 'tuple', 'enumerate', 'zip', 'sum',
+            'min', 'max', 'abs', 'round', 'bool', 'complex', 'sorted', 'reversed'
+        }
+        self.forbidden_builtins = {
+            'exec', 'eval', 'compile', 'breakpoint', 'open',
+            'read', 'write', 'getattr', '__import__', 'globals', 'locals'
+        }
         self.module_aliases = {}  # name -> module_name
         self.imported_funcs = {}  # name -> (module_name, func_name)
         self.error = None
 
     def visit_Import(self, node):
         for alias in node.names:
+            if alias.name not in self.allowed_modules:
+                self.error = f"Import of module '{alias.name}' is blocked"
+                return
             name = alias.asname or alias.name
-            if alias.name in self.forbidden_funcs:
-                self.module_aliases[name] = alias.name
+            self.module_aliases[name] = alias.name
         self.generic_visit(node)
 
     def visit_ImportFrom(self, node):
         module = node.module
-        if module in self.forbidden_funcs:
-            for alias in node.names:
-                name = alias.asname or alias.name
-                self.imported_funcs[name] = (module, alias.name)
+        if module not in self.allowed_modules:
+            self.error = f"Import from module '{module}' is blocked"
+            return
+        for alias in node.names:
+            name = alias.asname or alias.name
+            self.imported_funcs[name] = (module, alias.name)
         self.generic_visit(node)
 
     def visit_Call(self, node):
         if self.error:
             return
 
-        # 1. Handle getattr(os, 'remove')
-        if isinstance(node.func, ast.Name) and node.func.id == 'getattr':
-            if len(node.args) >= 2:
-                attr_arg = node.args[1]
-                attr_val = None
-                if isinstance(attr_arg, ast.Constant) and isinstance(attr_arg.value, str):
-                    attr_val = attr_arg.value
-                elif isinstance(attr_arg, ast.Str):
-                    attr_val = attr_arg.s
+        func = node.func
 
-                if attr_val:
-                    for mod, funcs in self.forbidden_funcs.items():
-                        if attr_val in funcs:
-                            self.error = f"Forbidden function access via getattr: {attr_val}"
-                            return
-
-        # 2. Handle Attribute calls: os.remove() or o.remove()
-        if isinstance(node.func, ast.Attribute):
-            obj = node.func.value
-            attr = node.func.attr
+        # Handle Attribute calls: os.startfile() or o.startfile()
+        if isinstance(func, ast.Attribute):
+            obj = func.value
+            attr = func.attr
 
             mod_name = None
             if isinstance(obj, ast.Name):
                 mod_name = self.module_aliases.get(obj.id)
-            elif isinstance(obj, ast.Call) and isinstance(obj.func, ast.Name) and obj.func.id == '__import__':
-                if len(obj.args) > 0:
-                    arg = obj.args[0]
-                    if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
-                        mod_name = arg.value
-                    elif isinstance(arg, ast.Str):
-                        mod_name = arg.s
 
-            if mod_name in self.forbidden_funcs:
-                if attr in self.forbidden_funcs[mod_name]:
-                    if mod_name == 'subprocess':
-                        if self._is_shell_true(node):
-                            self.error = f"Forbidden subprocess call with shell=True: {attr}"
-                            return
-                    else:
-                        self.error = f"Forbidden function call: {mod_name}.{attr}"
+            if mod_name:
+                if mod_name in self.module_whitelists:
+                    if attr not in self.module_whitelists[mod_name]:
+                        self.error = f"Function '{mod_name}.{attr}' is blocked"
                         return
+                elif mod_name not in self.allowed_modules:
+                    self.error = f"Module '{mod_name}' is not allowed"
+                    return
+            else:
+                # Object is not a known safe module alias
+                self.error = f"Call to attribute '{attr}' on unknown/unsafe object is blocked"
+                return
 
-        # 3. Handle direct calls: from os import remove; remove()
-        elif isinstance(node.func, ast.Name):
-            func_id = node.func.id
+        # Handle direct calls: print(), math.sqrt(), or imported sqrt()
+        elif isinstance(func, ast.Name):
+            func_id = func.id
+
+            # 1. Check forbidden builtins first
+            if func_id in self.forbidden_builtins:
+                self.error = f"Forbidden builtin function '{func_id}'"
+                return
+
+            # 2. Check if it's an imported function
             if func_id in self.imported_funcs:
                 mod_name, attr_name = self.imported_funcs[func_id]
-                if mod_name == 'subprocess':
-                    if self._is_shell_true(node):
-                        self.error = f"Forbidden subprocess call with shell=True: {attr_name}"
+                if mod_name in self.module_whitelists:
+                    if attr_name not in self.module_whitelists[mod_name]:
+                        self.error = f"Imported function '{mod_name}.{attr_name}' is blocked"
                         return
-                else:
-                    self.error = f"Forbidden function call: {mod_name}.{attr_name}"
+                elif mod_name not in self.allowed_modules:
+                    self.error = f"Imported module '{mod_name}' is not allowed"
                     return
+            # 3. Check if it's an allowed builtin
+            elif func_id in self.allowed_builtins:
+                pass
+            else:
+                self.error = f"Function call '{func_id}' is not whitelisted"
+                return
+
+        else:
+            # any other call (e.g. call to a result of another call)
+            self.error = "Complex function calls are blocked for security"
+            return
 
         self.generic_visit(node)
 
-    def _is_shell_true(self, node):
-        for keyword in node.keywords:
-            if keyword.arg == 'shell':
-                val = keyword.value
-                if isinstance(val, ast.Constant) and val.value is True:
-                    return True
-                elif isinstance(val, ast.NameConstant) and val.value is True:
-                    return True
-        return False
-
 class SafetyValidator:
     """
-    Scans Python code for forbidden functions and dangerous patterns using AST analysis
-    to prevent system damage.
+    Scans Python code for dangerous patterns using a strict WHITELIST AST analysis.
+    Assume all code is malicious unless proven otherwise.
     """
-    FORBIDDEN_FUNCS = {
-        'os': {'remove', 'rmdir', 'system', 'popen'},
-        'shutil': {'rmtree', 'rmdir'},
-        'subprocess': {'run', 'Popen', 'call', 'check_call', 'check_output'},
-    }
-
     def __init__(self, allow_subprocess_startfile=True):
-        self.allow_subprocess_startfile = allow_subprocess_startfile
+        # Parameter kept for compatibility but not used in strict whitelist
+        pass
 
     def validate(self, code: str) -> Tuple[bool, str]:
         """
-        Validates the provided code using AST analysis.
+        Validates the provided code using a strict whitelist AST analysis.
         Returns (is_safe, error_message).
         """
         try:
@@ -124,7 +125,7 @@ class SafetyValidator:
         except SyntaxError as e:
             return False, f"Syntax error in code: {e}"
 
-        visitor = SafetyVisitor(self.FORBIDDEN_FUNCS)
+        visitor = SafetyVisitor()
         visitor.visit(tree)
 
         if visitor.error:
