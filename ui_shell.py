@@ -71,8 +71,8 @@ class DynamicIsland(QWidget):
 
         # Animation setup
         self.animation = QPropertyAnimation(self, b"geometry")
-        self.animation.setDuration(300)
-        self.animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
+        self.animation.setDuration(450)
+        self.animation.setEasingCurve(QEasingCurve.Type.OutBack)
 
     def enable_blur_behind(self):
         """Applies the native Windows Acrylic blur effect to the current window."""
