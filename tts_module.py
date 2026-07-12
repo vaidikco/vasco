@@ -6,9 +6,9 @@ import edge_tts
 
 class TextToSpeech:
     def __init__(self, voice="en-US-ChristopherNeural"):
-        # "en-US-ChristopherNeural" is a great, deep male voice for Jarvis
+        # "en-US-ChristopherNeural" is a great, deep male voice for Vasco
         self.voice = voice
-        self.output_file = "jarvis_response.wav"
+        self.output_file = "Vasco_response.wav"
         self.is_speaking = False
 
     async def _generate_and_play(self, text):
@@ -39,10 +39,11 @@ class TextToSpeech:
 if __name__ == "__main__":
     tts = TextToSpeech()
     test_phrase = "System check complete. Voice modules upgraded to Edge Neural. I am now fully operational and awaiting your command."
-    print(f"Jarvis is saying: {test_phrase}")
+    print(f"Vasco is saying: {test_phrase}")
     tts.speak(test_phrase)
     
     import time
     while tts.is_currently_speaking():
         time.sleep(0.1)
     print("Speech finished.")
+

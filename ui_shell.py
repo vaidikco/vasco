@@ -4,8 +4,8 @@ from ctypes import wintypes
 from PyQt6.QtWidgets import QApplication, QWidget, QFrame, QVBoxLayout, QLabel
 from PyQt6.QtCore import Qt, QPropertyAnimation, QRect, QEasingCurve, QPoint, QSize
 from PyQt6.QtGui import QColor, QPalette
-from core_bridge import JarvisSignals
-from jarvis_core import CoreWorker
+from core_bridge import VascoSignals
+from Vasco_core import CoreWorker
 from asr_module import SpeechRecognizer
 from tts_module import TextToSpeech
 import threading
@@ -50,7 +50,7 @@ class DynamicIsland(QWidget):
         # format: (width, height, color, text)
         # Using rgba for Acrylic transparency
         self.states = {
-            "IDLE": (int(150 * self.scale_factor), int(35 * self.scale_factor), "rgba(44, 62, 80, 0.4)", "Jarvis"),
+            "IDLE": (int(150 * self.scale_factor), int(35 * self.scale_factor), "rgba(44, 62, 80, 0.4)", "Vasco"),
             "LISTENING": (int(300 * self.scale_factor), int(50 * self.scale_factor), "rgba(52, 152, 219, 0.4)", "Listening..."),
             "THINKING": (int(300 * self.scale_factor), int(50 * self.scale_factor), "rgba(155, 89, 182, 0.4)", "Thinking..."),
             "SPEAKING": (int(300 * self.scale_factor), int(50 * self.scale_factor), "rgba(46, 204, 113, 0.4)", "Speaking..."),
@@ -69,7 +69,7 @@ class DynamicIsland(QWidget):
         self.setFixedSize(*self.states["IDLE"][:2])
         self.container.setStyleSheet(self._get_style(self.states["IDLE"][2]))
 
-        self.label = QLabel("Jarvis", self.container)
+        self.label = QLabel("Vasco", self.container)
         self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.label.setStyleSheet("color: white; font-family: 'Segoe UI', sans-serif; font-weight: bold; font-size: 14px;")
 
@@ -157,7 +157,7 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
 
     # Initialize signals
-    signals = JarvisSignals()
+    signals = VascoSignals()
 
     # Initialize TTS
     tts = TextToSpeech()
@@ -176,3 +176,4 @@ if __name__ == "__main__":
     asr_thread.start()
 
     sys.exit(app.exec())
+

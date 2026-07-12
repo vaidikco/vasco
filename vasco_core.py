@@ -2,36 +2,36 @@ import asyncio
 import logging
 from enum import Enum
 from PyQt6.QtCore import QThread, pyqtSlot
-from core_bridge import JarvisSignals
+from core_bridge import VascoSignals
 from brain_router import BrainRouter
 from executor import ScriptExecutor
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger("JarvisCore")
+logger = logging.getLogger("VascoCore")
 
-class JarvisState(Enum):
+class VascoState(Enum):
     IDLE = "IDLE"
     LISTENING = "LISTENING"
     THINKING = "THINKING"
     SPEAKING = "SPEAKING"
     EXECUTING = "EXECUTING"
 
-class JarvisCore:
+class VascoCore:
     """
-    The central orchestrator for Jarvis. Manages the global state machine
+    The central orchestrator for Vasco. Manages the global state machine
     and coordinates between ASR, LLM, and TTS components.
     """
-    def __init__(self, signals: JarvisSignals, tts=None):
+    def __init__(self, signals: VascoSignals, tts=None):
         self.signals = signals
-        self.state = JarvisState.IDLE
+        self.state = VascoState.IDLE
         self._stop_event = asyncio.Event()
         self.router = BrainRouter()
         self.executor = ScriptExecutor()
         self.tts = tts
         self.loop = None
 
-    def set_state(self, state: JarvisState):
+    def set_state(self, state: VascoState):
         """Updates the core state and notifies the UI."""
         logger.info(f"State transition: {self.state.value} -> {state.value}")
         self.state = state
@@ -43,7 +43,7 @@ class JarvisCore:
         logger.info(f"ASR Result: {text}")
 
         if self.loop is None:
-            logger.warning("JarvisCore loop not yet initialized. Dropping ASR result.")
+            logger.warning("VascoCore loop not yet initialized. Dropping ASR result.")
             return
 
         asyncio.run_coroutine_threadsafe(self._process_asr_logic(text), self.loop)
@@ -52,11 +52,11 @@ class JarvisCore:
         """Internal async logic for ASR results."""
         from asr_module import WAKE_WORD
 
-        if self.state == JarvisState.IDLE:
+        if self.state == VascoState.IDLE:
             if WAKE_WORD in text:
                 logger.info("Wake word detected!")
-                self.set_state(JarvisState.LISTENING)
-        elif self.state == JarvisState.LISTENING:
+                self.set_state(VascoState.LISTENING)
+        elif self.state == VascoState.LISTENING:
             # Any text received while LISTENING is treated as the command
             logger.info(f"Command captured: {text}")
             await self.process_text(text)
@@ -66,7 +66,7 @@ class JarvisCore:
         logger.info(f"Processing text: {text}")
 
         # 1. Enter THINKING state
-        self.set_state(JarvisState.THINKING)
+        self.set_state(VascoState.THINKING)
 
         # 2. Route and get response
         route, prompt = await self.router.route_intent(text)
@@ -75,7 +75,7 @@ class JarvisCore:
         # 3. Determine next state
         if route == "local":
             # Local intents trigger execution
-            self.set_state(JarvisState.EXECUTING)
+            self.set_state(VascoState.EXECUTING)
             logger.info(f"Executing local command: {text}")
 
             # Generate script (mocked simulation of LLM)
@@ -90,7 +90,7 @@ class JarvisCore:
                 logger.error(f"Could not generate script for: {text}")
         else:
             # Cloud intents usually trigger a spoken response
-            self.set_state(JarvisState.SPEAKING)
+            self.set_state(VascoState.SPEAKING)
             logger.info(f"Speaking cloud response for: {text}")
             if self.tts:
                 self.tts.speak(f"You said {text}. I am processing your request.")
@@ -101,7 +101,7 @@ class JarvisCore:
 
         # Return to IDLE after a short delay
         await asyncio.sleep(1)
-        self.set_state(JarvisState.IDLE)
+        self.set_state(VascoState.IDLE)
 
         return route
 
@@ -122,16 +122,16 @@ class JarvisCore:
         """
         The main async entry point.
         """
-        logger.info("JarvisCore async loop started.")
+        logger.info("VascoCore async loop started.")
         try:
             # Set initial state
-            self.set_state(JarvisState.IDLE)
+            self.set_state(VascoState.IDLE)
             # Wait until stop event is set
             await self._stop_event.wait()
         except asyncio.CancelledError:
-            logger.info("JarvisCore async loop cancelled.")
+            logger.info("VascoCore async loop cancelled.")
         finally:
-            logger.info("JarvisCore async loop stopped.")
+            logger.info("VascoCore async loop stopped.")
 
     def stop(self):
         """Signals the async loop to stop."""
@@ -140,16 +140,16 @@ class JarvisCore:
 class CoreWorker(QThread):
     """
     A QThread wrapper that runs a dedicated asyncio event loop.
-    This allows JarvisCore to run in the background without blocking the PyQt6 UI thread.
+    This allows VascoCore to run in the background without blocking the PyQt6 UI thread.
     """
-    def __init__(self, signals: JarvisSignals, tts=None):
+    def __init__(self, signals: VascoSignals, tts=None):
         super().__init__()
         self.signals = signals
-        self.core = JarvisCore(signals, tts=tts)
+        self.core = VascoCore(signals, tts=tts)
         self._loop = None
 
     def run(self):
-        """Entry point for QThread. Sets up the asyncio loop and runs JarvisCore."""
+        """Entry point for QThread. Sets up the asyncio loop and runs VascoCore."""
         # Create a new event loop for this thread
         self._loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self._loop)
@@ -169,3 +169,4 @@ class CoreWorker(QThread):
         self.core.stop()
         self.quit()
         self.wait()
+

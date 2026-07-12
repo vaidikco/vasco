@@ -184,3 +184,4 @@ class ScriptExecutor:
             return False, f"Execution Error:\n{errors}"
 
         return True, output if output else "Script executed successfully with no output."
+

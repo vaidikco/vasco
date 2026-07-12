@@ -10,7 +10,7 @@ from vosk import Model, KaldiRecognizer
 # Configuration
 MODEL_URL = "https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip"
 MODEL_PATH = "model"
-WAKE_WORD = "hey jarvis"
+WAKE_WORD = "hey Vasco"
 
 class SpeechRecognizer:
     def __init__(self, callback_function=None):
@@ -59,7 +59,7 @@ class SpeechRecognizer:
 if __name__ == "__main__":
     # FIXED: Added 'event' argument to match the callback call
     def on_wake_word(event):
-        print(f"\n>>> JARVIS ACTIVATED via {event}! <<<\n")
+        print(f"\n>>> Vasco ACTIVATED via {event}! <<<\n")
 
     recognizer = SpeechRecognizer(callback_function=on_wake_word)
     try:
@@ -67,3 +67,4 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("Stopping...")
         recognizer.stop_listening()
+

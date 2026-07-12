@@ -83,3 +83,4 @@ class BrainRouter:
         if route == "cloud":
             return await self.cloud_client.generate(prompt)
         return await self.local_client.generate(prompt)
+
