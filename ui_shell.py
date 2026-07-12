@@ -87,6 +87,48 @@ class OCRWaveOverlay(QWidget):
         self.animation.stop()
         self.hide()
 
+class OCRWaveOverlay(QWidget):
+... [existing code] ...
+    def stop_wave(self):
+        self.animation.stop()
+        self.hide()
+
+class IslandContainer(QFrame):
+    """
+    A custom container for the Dynamic Island that can render a
+    pulsing progress ring during processing states.
+    """
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.progress = 0.0
+        self.is_processing = False
+
+    def set_processing(self, active: bool):
+        self.is_processing = active
+        self.update()
+
+    def set_progress(self, value: float):
+        self.progress = value
+        self.update()
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        if not self.is_processing:
+            return
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        # Draw a subtle glowing ring around the edge
+        pen = QPen(QColor(255, 255, 255, 100))
+        pen.setWidth(3)
+        painter.setPen(pen)
+
+        rect = self.rect().adjusted(2, 2, -2, -2)
+        # Draw only the progress arc
+        span_angle = int(self.progress * 360 * 16)
+        painter.drawArc(rect, 90 * 16, -span_angle)
+
 class DynamicIsland(QWidget):
     def __init__(self, signals=None):
         super().__init__()
@@ -125,8 +167,9 @@ class DynamicIsland(QWidget):
         self.main_layout = QVBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
 
-        self.container = QFrame()
+        self.container = IslandContainer()
         self.container.setObjectName("islandContainer")
+
 
         # Sizing and Positioning - Must be set before style to get correct height() for border-radius
         self.setFixedSize(*self.states["IDLE"][:2])
@@ -190,6 +233,17 @@ class DynamicIsland(QWidget):
         y = screen.y() + 10 # Slight offset from the very top
         self.move(x, y)
 
+    def _start_progress_animation(self):
+        """Animates the progress ring from 0 to 1."""
+        self.progress_anim = QVariantAnimation()
+        self.progress_anim.setStartValue(0.0)
+        self.progress_anim.setEndValue(1.0)
+        self.progress_anim.setDuration(2000)
+        self.progress_anim.setLoopCount(-1)
+        self.progress_anim.setEasingCurve(QEasingCurve.Type.InOutSine)
+        self.progress_anim.valueChanged.connect(self.container.set_progress)
+        self.progress_anim.start()
+
     def update_text(self, text):
         """Updates the label text without changing the overall state."""
         self.label.setText(text)
@@ -207,6 +261,19 @@ class DynamicIsland(QWidget):
 
         self.current_state = state
         width, height, color, text = self.states[state]
+
+        # Handle Progress Ring
+        if state in ["THINKING", "EXECUTING"]:
+            self.container.set_processing(True)
+            self._start_progress_animation()
+        else:
+            self.container.set_processing(False)
+            self.container.set_progress(0.0)
+
+        # Update text and style
+        self.label.setText(text)
+        self.container.setStyleSheet(self._get_style(color))
+
 
         # Update text and style
         self.label.setText(text)
@@ -245,4 +312,5 @@ if __name__ == "__main__":
     asr_thread.start()
 
     sys.exit(app.exec())
+
 
