@@ -22,12 +22,14 @@ class JarvisCore:
     The central orchestrator for Jarvis. Manages the global state machine
     and coordinates between ASR, LLM, and TTS components.
     """
-    def __init__(self, signals: JarvisSignals):
+    def __init__(self, signals: JarvisSignals, tts=None):
         self.signals = signals
         self.state = JarvisState.IDLE
         self._stop_event = asyncio.Event()
         self.router = BrainRouter()
         self.executor = ScriptExecutor()
+        self.tts = tts
+        self.loop = None
 
     def set_state(self, state: JarvisState):
         """Updates the core state and notifies the UI."""
@@ -35,6 +37,29 @@ class JarvisCore:
         self.state = state
         # Emit signal to the UI thread
         self.signals.state_changed.emit(state.value)
+
+    def handle_asr_result(self, text: str):
+        """Callback for ASR module. Handles wake word and command capture."""
+        logger.info(f"ASR Result: {text}")
+
+        if self.loop is None:
+            logger.warning("JarvisCore loop not yet initialized. Dropping ASR result.")
+            return
+
+        asyncio.run_coroutine_threadsafe(self._process_asr_logic(text), self.loop)
+
+    async def _process_asr_logic(self, text: str):
+        """Internal async logic for ASR results."""
+        from asr_module import WAKE_WORD
+
+        if self.state == JarvisState.IDLE:
+            if WAKE_WORD in text:
+                logger.info("Wake word detected!")
+                self.set_state(JarvisState.LISTENING)
+        elif self.state == JarvisState.LISTENING:
+            # Any text received while LISTENING is treated as the command
+            logger.info(f"Command captured: {text}")
+            await self.process_text(text)
 
     async def process_text(self, text: str):
         """Processes user text through the brain router and manages state transitions."""
@@ -67,8 +92,14 @@ class JarvisCore:
             # Cloud intents usually trigger a spoken response
             self.set_state(JarvisState.SPEAKING)
             logger.info(f"Speaking cloud response for: {text}")
+            if self.tts:
+                self.tts.speak(f"You said {text}. I am processing your request.")
+                while self.tts.is_currently_speaking():
+                    await asyncio.sleep(0.1)
+            else:
+                await asyncio.sleep(2)
 
-        # Return to IDLE after a short delay (simulation)
+        # Return to IDLE after a short delay
         await asyncio.sleep(1)
         self.set_state(JarvisState.IDLE)
 
@@ -89,33 +120,14 @@ class JarvisCore:
 
     async def run(self):
         """
-        The main async entry point. This loop orchestrates the Jarvis pipeline.
-        For now, it implements a test loop to verify UI responsiveness.
+        The main async entry point.
         """
         logger.info("JarvisCore async loop started.")
         try:
-            while not self._stop_event.is_set():
-                # Simulate the pipeline sequence
-                # 1. IDLE
-                self.set_state(JarvisState.IDLE)
-                await asyncio.sleep(3)
-
-                # 2. LISTENING
-                self.set_state(JarvisState.LISTENING)
-                await asyncio.sleep(2)
-
-                # 3. THINKING
-                self.set_state(JarvisState.THINKING)
-                await asyncio.sleep(2)
-
-                # 4. SPEAKING
-                self.set_state(JarvisState.SPEAKING)
-                await asyncio.sleep(2)
-
-                # 5. EXECUTING
-                self.set_state(JarvisState.EXECUTING)
-                await asyncio.sleep(2)
-
+            # Set initial state
+            self.set_state(JarvisState.IDLE)
+            # Wait until stop event is set
+            await self._stop_event.wait()
         except asyncio.CancelledError:
             logger.info("JarvisCore async loop cancelled.")
         finally:
@@ -130,10 +142,10 @@ class CoreWorker(QThread):
     A QThread wrapper that runs a dedicated asyncio event loop.
     This allows JarvisCore to run in the background without blocking the PyQt6 UI thread.
     """
-    def __init__(self, signals: JarvisSignals):
+    def __init__(self, signals: JarvisSignals, tts=None):
         super().__init__()
         self.signals = signals
-        self.core = JarvisCore(signals)
+        self.core = JarvisCore(signals, tts=tts)
         self._loop = None
 
     def run(self):
@@ -141,6 +153,7 @@ class CoreWorker(QThread):
         # Create a new event loop for this thread
         self._loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self._loop)
+        self.core.loop = self._loop
 
         logger.info("CoreWorker: Starting asyncio loop in separate thread.")
         try:

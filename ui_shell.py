@@ -6,6 +6,9 @@ from PyQt6.QtCore import Qt, QPropertyAnimation, QRect, QEasingCurve, QPoint, QS
 from PyQt6.QtGui import QColor, QPalette
 from core_bridge import JarvisSignals
 from jarvis_core import CoreWorker
+from asr_module import SpeechRecognizer
+from tts_module import TextToSpeech
+import threading
 
 # Win32 API for Acrylic Blur
 class ACCENT_POLICY(ctypes.Structure):
@@ -156,12 +159,20 @@ if __name__ == "__main__":
     # Initialize signals
     signals = JarvisSignals()
 
+    # Initialize TTS
+    tts = TextToSpeech()
+
     # Initialize UI
     island = DynamicIsland(signals=signals)
     island.show()
 
     # Initialize and start the Core Worker (Asyncio Orchestrator)
-    worker = CoreWorker(signals=signals)
+    worker = CoreWorker(signals=signals, tts=tts)
     worker.start()
+
+    # Initialize ASR and start listening in a background thread
+    recognizer = SpeechRecognizer(callback_function=worker.core.handle_asr_result)
+    asr_thread = threading.Thread(target=recognizer.start_listening, daemon=True)
+    asr_thread.start()
 
     sys.exit(app.exec())

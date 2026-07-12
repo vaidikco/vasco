@@ -50,10 +50,8 @@ class SpeechRecognizer:
                     text = result.get("text", "").lower()
                     if text:
                         print(f"Heard: {text}")
-                        if WAKE_WORD in text:
-                            print("Wake word detected!")
-                            if self.callback:
-                                self.callback("wake_word")
+                        if self.callback:
+                            self.callback(text)
 
     def stop_listening(self):
         self.is_listening = False
