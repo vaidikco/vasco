@@ -157,6 +157,7 @@ class DynamicIsland(QWidget):
             "SPEAKING": (int(300 * self.scale_factor), int(50 * self.scale_factor), "rgba(46, 204, 113, 0.4)", "Speaking..."),
             "EXECUTING": (int(300 * self.scale_factor), int(50 * self.scale_factor), "rgba(230, 126, 34, 0.4)", "Executing..."),
             "SCANNING": (int(300 * self.scale_factor), int(50 * self.scale_factor), "rgba(0, 150, 255, 0.4)", "Scanning Screen..."),
+            "SUGGESTION": (int(300 * self.scale_factor), int(50 * self.scale_factor), "rgba(155, 255, 155, 0.4)", "Vasco Suggests..."),
         }
         self.current_state = "IDLE"
 

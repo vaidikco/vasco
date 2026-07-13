@@ -7,6 +7,7 @@ from brain_router import BrainRouter
 from executor import ScriptExecutor
 from ocr_module import OCRModule
 from memory_manager import MemoryManager
+from observer_module import ObserverModule
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -19,6 +20,7 @@ class VascoState(Enum):
     SPEAKING = "SPEAKING"
     EXECUTING = "EXECUTING"
     SCANNING = "SCANNING"
+    SUGGESTION = "SUGGESTION"
 
 class VascoCore:
     """
@@ -33,6 +35,7 @@ class VascoCore:
         self.executor = ScriptExecutor()
         self.ocr = OCRModule()
         self.memory = MemoryManager()
+        self.observer = ObserverModule(self.ocr)
         self.tts = tts
         self.loop = None
 
@@ -173,12 +176,48 @@ class VascoCore:
         try:
             # Set initial state
             self.set_state(VascoState.IDLE)
+
+            # Start the background observation loop
+            asyncio.create_task(self._observation_loop())
+
             # Wait until stop event is set
             await self._stop_event.wait()
         except asyncio.CancelledError:
             logger.info("VascoCore async loop cancelled.")
         finally:
             logger.info("VascoCore async loop stopped.")
+
+    async def _observation_loop(self):
+        """
+        Background task that monitors the environment and triggers proactive suggestions.
+        """
+        logger.info("Starting Background Observer loop...")
+        while not self._stop_event.is_set():
+            try:
+                # Get current context
+                loop = asyncio.get_running_loop()
+                ctx = await loop.run_in_executor(None, self.observer.get_current_context)
+
+                # Proactive Trigger: If we see "Error" or "Crash" in the active window
+                if "error" in ctx['window_title'].lower() or "crash" in ctx['window_title'].lower():
+                    if self.state == VascoState.IDLE:
+                        logger.info("Proactive trigger: Error detected in active window!")
+                        self.set_state(VascoState.SUGGESTION)
+                        if self.tts:
+                            self.tts.speak("I noticed an error on your screen. Would you like me to help fix it?")
+                            while self.tts.is_currently_speaking():
+                                await asyncio.sleep(0.1)
+
+                        # Return to IDLE after a while if no interaction
+                        await asyncio.sleep(10)
+                        if self.state == VascoState.SUGGESTION:
+                            self.set_state(VascoState.IDLE)
+
+                await asyncio.sleep(5) # Check every 5 seconds
+            except Exception as e:
+                logger.error(f"Observation loop error: {e}")
+                await asyncio.sleep(10)
+
 
     def stop(self):
         """Signals the async loop to stop."""
