@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import QApplication, QWidget, QFrame, QVBoxLayout, QLabel
 from PyQt6.QtCore import Qt, QPropertyAnimation, QRect, QEasingCurve, QPoint, QSize, QVariantAnimation
 from PyQt6.QtGui import QColor, QPalette, QPainter, QPen, QRadialGradient
 from core_bridge import VascoSignals
-from Vasco_core import CoreWorker
+from vasco_core import CoreWorker
 from asr_module import SpeechRecognizer
 from tts_module import TextToSpeech
 import threading
@@ -87,12 +87,6 @@ class OCRWaveOverlay(QWidget):
         self.animation.stop()
         self.hide()
 
-class OCRWaveOverlay(QWidget):
-... [existing code] ...
-    def stop_wave(self):
-        self.animation.stop()
-        self.hide()
-
 class IslandContainer(QFrame):
     """
     A custom container for the Dynamic Island that can render a
@@ -170,7 +164,6 @@ class DynamicIsland(QWidget):
 
         self.container = IslandContainer()
         self.container.setObjectName("islandContainer")
-
 
         # Sizing and Positioning - Must be set before style to get correct height() for border-radius
         self.setFixedSize(*self.states["IDLE"][:2])
@@ -275,11 +268,6 @@ class DynamicIsland(QWidget):
         self.label.setText(text)
         self.container.setStyleSheet(self._get_style(color))
 
-
-        # Update text and style
-        self.label.setText(text)
-        self.container.setStyleSheet(self._get_style(color))
-
         # Animate size and position
         screen = QApplication.primaryScreen().availableGeometry()
         new_x = (screen.width() - width) // 2
@@ -309,9 +297,8 @@ if __name__ == "__main__":
 
     # Initialize ASR and start listening in a background thread
     recognizer = SpeechRecognizer(callback_function=worker.core.handle_asr_result)
+    worker.core.set_asr(recognizer)
     asr_thread = threading.Thread(target=recognizer.start_listening, daemon=True)
     asr_thread.start()
 
     sys.exit(app.exec())
-
-
