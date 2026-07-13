@@ -8,3 +8,4 @@ class VascoSignals(QObject):
     state_changed = pyqtSignal(str)
     text_update = pyqtSignal(str)
 
+

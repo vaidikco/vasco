@@ -18,3 +18,4 @@ def test_ocr():
 
 if __name__ == "__main__":
     test_ocr()
+

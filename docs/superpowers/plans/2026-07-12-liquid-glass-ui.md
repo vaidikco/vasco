@@ -84,3 +84,4 @@
 - [ ] ** Step 4: Commit**
   `git add E:\ai\ui_shell.py`
   `git commit -m "feat(ui): add elastic spring animations"`
+

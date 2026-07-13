@@ -68,3 +68,4 @@ if __name__ == "__main__":
         print("Stopping...")
         recognizer.stop_listening()
 
+

@@ -84,3 +84,4 @@ class BrainRouter:
             return await self.cloud_client.generate(prompt)
         return await self.local_client.generate(prompt)
 
+

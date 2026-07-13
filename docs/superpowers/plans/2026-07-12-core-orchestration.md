@@ -4,7 +4,7 @@
 
 **Goal:** Implement the central "Brain" that coordinates ASR, LLM, and TTS while updating the Dynamic Island UI.
 
-**Architecture:** An asynchronous orchestrator (`JarvisCore`) that manages a state machine and routes intents between local/cloud LLMs and a dynamic OS execution engine.
+**Architecture:** An asynchronous orchestrator (`VascoCore`) that manages a state machine and routes intents between local/cloud LLMs and a dynamic OS execution engine.
 
 **Tech Stack:** Python 3.11+, `asyncio`, `PyQt6`, `ollama` (Local LLM), `openai/anthropic` (Cloud LLM).
 
@@ -23,13 +23,13 @@
 - Modify: `E:\ai\ui_shell.py`
 
 **Interfaces:**
-- Produces: `JarvisSignals(QObject)` with signals `state_changed(str)` and `text_update(str)`.
+- Produces: `VascoSignals(QObject)` with signals `state_changed(str)` and `text_update(str)`.
 
-- [ ] **Step 1: Create `core_bridge.py` with `JarvisSignals` class**
+- [ ] **Step 1: Create `core_bridge.py` with `VascoSignals` class**
   Define a `QObject` that contains the signals used to sync the Core and the UI.
 
-- [ ] **Step 2: Integrate `JarvisSignals` into `DynamicIsland`**
-  Modify `ui_shell.py` to accept a `JarvisSignals` instance and connect its signals to `set_state` and a new `update_text` method.
+- [ ] **Step 2: Integrate `VascoSignals` into `DynamicIsland`**
+  Modify `ui_shell.py` to accept a `VascoSignals` instance and connect its signals to `set_state` and a new `update_text` method.
 
 - [ ] **Step 3: Verify signal connectivity**
   Write a test script that emits a signal and verify the Dynamic Island changes state visually.
@@ -40,27 +40,27 @@
 
 ---
 
-### Task 2: JarvisCore & Asyncio Orchestrator
+### Task 2: VascoCore & Asyncio Orchestrator
 
 **Files:**
-- Create: `E:\ai\jarvis_core.py`
+- Create: `E:\ai\Vasco_core.py`
 - Modify: `E:\ai\ui_shell.py` (entry point)
 
 **Interfaces:**
-- Consumes: `JarvisSignals`
-- Produces: `JarvisCore.run()` async entry point.
+- Consumes: `VascoSignals`
+- Produces: `VascoCore.run()` async entry point.
 
-- [ ] **Step 1: Implement `JarvisCore` state management**
+- [ ] **Step 1: Implement `VascoCore` state management**
   Create the core class with an internal state machine and the `asyncio` event loop.
 
 - [ ] **Step 2: Implement the Async Loop Worker**
-  Create a `QThread` wrapper that runs the `asyncio` loop, allowing `JarvisCore` to run in the background without blocking the UI.
+  Create a `QThread` wrapper that runs the `asyncio` loop, allowing `VascoCore` to run in the background without blocking the UI.
 
 - [ ] **Step 3: Verify loop execution**
-  Run a test where `JarvisCore` emits a "THINKING" signal every 2 seconds to the UI.
+  Run a test where `VascoCore` emits a "THINKING" signal every 2 seconds to the UI.
 
 - [ ] **Step 4: Commit**
-  `git add E:\ai\jarvis_core.py E:\ai\ui_shell.py`
+  `git add E:\ai\Vasco_core.py E:\ai\ui_shell.py`
   `git commit -m "feat(core): implement asyncio orchestrator and thread worker"`
 
 ---
@@ -69,7 +69,7 @@
 
 **Files:**
 - Create: `E:\ai\brain_router.py`
-- Modify: `E:\ai\jarvis_core.py`
+- Modify: `E:\ai\Vasco_core.py`
 
 **Interfaces:**
 - Consumes: User text input.
@@ -88,7 +88,7 @@
   Test with "Open Notepad" (Local) and "Explain quantum physics" (Cloud) and verify the destination.
 
 - [ ] **Step 5: Commit**
-  `git add E:\ai\brain_router.py E:\ai\jarvis_core.py`
+  `git add E:\ai\brain_router.py E:\ai\Vasco_core.py`
   `git commit -m "feat(brain): implement hybrid local/cloud routing"`
 
 ---
@@ -97,7 +97,7 @@
 
 **Files:**
 - Create: `E:\ai\executor.py`
-- Modify: `E:\ai\jarvis_core.py`
+- Modify: `E:\ai\Vasco_core.py`
 
 **Interfaces:**
 - Consumes: LLM-generated Python code.
@@ -116,7 +116,7 @@
   Test: LLM generates a script to open a specific app $\rightarrow$ Core executes $\rightarrow$ App opens.
 
 - [ ] **Step 5: Commit**
-  `git add E:\ai\executor.py E:\ai\jarvis_core.py`
+  `git add E:\ai\executor.py E:\ai\Vasco_core.py`
   `git commit -m "feat(executor): implement dynamic script execution and safety filter"`
 
 ---
@@ -124,7 +124,7 @@
 ### Task 5: Full Pipeline Integration (ASR -> LLM -> TTS)
 
 **Files:**
-- Modify: `E:\ai\jarvis_core.py`
+- Modify: `E:\ai\Vasco_core.py`
 - Modify: `E:\ai\asr_module.py`
 - Modify: `E:\ai\tts_module.py`
 - Modify: `E:\ai\ui_shell.py` (Main entry)
@@ -132,15 +132,16 @@
 **Interfaces:**
 - End-to-End Flow: Wake Word $\rightarrow$ Listen $\rightarrow$ Route $\rightarrow$ Execute/Reason $\rightarrow$ Speak.
 
-- [ ] **Step 1: Connect ASR callback to `JarvisCore`**
+- [ ] **Step 1: Connect ASR callback to `VascoCore`**
   Modify `SpeechRecognizer` to emit a signal/event that the Core catches to start the `LISTENING` state.
 
 - [ ] **Step 2: Connect Core to TTS**
   Integrate `TextToSpeech.speak()` into the final stage of the Core's pipeline.
 
 - [ ] **Step 3: Final End-to-End Test**
-  Test the full flow: "Hey Jarvis" $\rightarrow$ "Open Chrome" $\rightarrow$ (Island animates) $\rightarrow$ Chrome opens $\rightarrow$ "Opening Chrome now".
+  Test the full flow: "Hey Vasco" $\rightarrow$ "Open Chrome" $\rightarrow$ (Island animates) $\rightarrow$ Chrome opens $\rightarrow$ "Opening Chrome now".
 
 - [ ] **Step 4: Commit**
   `git add .`
   `git commit -m "feat(core): full end-to-end integration of ASR, Brain, and TTS"`
+
