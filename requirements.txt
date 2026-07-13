@@ -1,0 +1,28 @@
+# Vasco core dependencies — cross-platform (macOS + Windows).
+# Install with:  pip install -r requirements.txt
+
+# --- Voice output (Microsoft neural voice, spoken in-process) ---
+edge-tts>=6.1.0
+sounddevice>=0.4.6      # microphone capture + audio playback (PortAudio)
+soundfile>=0.12.1       # decodes the MP3 reply so playback works everywhere
+
+# --- Speech recognition ---
+vosk>=0.3.44            # fast, offline wake-word + real-time segmentation
+faster-whisper>=1.0.0   # accurate command transcription (CPU, macOS + Windows)
+numpy>=1.24             # audio buffers for Whisper
+
+# --- Brain (local by default; cloud optional) ---
+httpx>=0.27.0           # talks to the local Ollama server
+anthropic>=0.80.0       # only used if you set ANTHROPIC_API_KEY; harmless otherwise
+
+# --- UI ---
+PyQt6>=6.6.0
+
+# Optional extras live in requirements-optional.txt:
+#   - screen OCR ("what's on my screen"): easyocr, opencv-python-headless, mss
+#   - semantic memory recall: sentence-transformers
+# Vasco runs fine without them (keyword memory recall, no OCR).
+#
+# Note: if faster-whisper won't install on your Python, Vasco still runs on
+# Vosk alone (set VASCO_ASR_ENGINE=vosk). Python 3.11–3.13 has the widest
+# wheel coverage; 3.14 also works.

@@ -1,0 +1,9 @@
+# Optional heavyweight features (~2GB+ of dependencies, pulls in PyTorch)
+
+# Screen OCR — lets Vasco read your screen ("what's on my screen?")
+easyocr>=1.7.0
+opencv-python-headless>=4.8.0
+mss>=9.0.0
+
+# Semantic memory — recall by meaning instead of keyword overlap
+sentence-transformers>=2.2.0

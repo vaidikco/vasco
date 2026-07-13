@@ -5,3 +5,5 @@ settings.json
 .env
 .vscode/
 .idea/
+temp_extract/
+extract_*.py
